@@ -1,0 +1,75 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var Emprise_47 = ee.FeatureCollection("projects/departementsbjuser123/assets/Emprise_47");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//////////////////// TELECHARGEMENT MNT via RGE_ALTI/1M //////////////////////////
+
+// Pour changer la zone à télécharger remplacer ROI dans la ligne ci-dessous par le nom de la zone (en violet)
+var AOI = Emprise_47;
+
+// Indiquer le SCR de la zone à classifier (en rouge)
+var CRS = 'EPSG: 2154';
+
+// Nommer le dossier dans lequel enregistrer le mnt (en rouge)
+var dossier = '47_lot_et_garonne';
+
+// Nommer le fichier de sortie (en rouge)
+var fichier = 'mnt';
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////// DEBUT SCRIPT ///////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+                                                            Map.centerObject(AOI,10);
+                                                            Map.setOptions('SATELLITE');
+
+var dataset = ee.Image('IGN/RGE_ALTI/1M/2_0/FXX');
+var MNT = dataset.select('MNT');
+
+var clipped_MNT = MNT.clip(AOI);
+
+
+
+var elevation = clipped_MNT.reproject('EPSG: 2154', null, 10);
+
+var minMaxValues = elevation.reduceRegion({reducer: ee.Reducer.minMax(), geometry: AOI, maxPixels: 1e13});
+var minMax = ee.Dictionary({
+  minVal: minMaxValues.getNumber('MNT_min'),
+  maxVal: minMaxValues.getNumber('MNT_max')
+});
+
+print(minMax);
+
+minMax.evaluate(function(dict) {
+  var vizParams = {
+    min: dict.minVal, 
+    max: dict.maxVal, 
+    palette: ['darkblue','aqua','limegreen','yellow','orange','red','darkred','white']
+  };
+
+  Map.addLayer(elevation, vizParams, 'elevation');
+});
+
+
+var slope = ee.Terrain.slope(elevation);
+//Map.addLayer(slope,{min:0,max:50},'pente');
+
+var aspect = ee.Terrain.aspect(elevation);
+//Map.addLayer(aspect,{min:0,max:360},'aspect');
+
+var algoTerrain = ee.Algorithms.Terrain(elevation);
+var hillshade = algoTerrain.select('hillshade');
+//Map.addLayer(hillshade,{min:90,max:200},'hillshade')
+
+// Export_images
+Export.image.toDrive({
+  image: elevation,
+  folder: dossier,
+  description: fichier,
+  scale: 10,
+  maxPixels: 1303663927,
+  crs:CRS,
+  crsTransform:'',
+  region: AOI
+});

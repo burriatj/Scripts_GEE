@@ -1,0 +1,50 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var ROI = 
+    /* color: #d63000 */
+    /* shown: false */
+    ee.Geometry.Polygon(
+        [[[37.60332575170119, -3.0613452326376653],
+          [37.68572321263869, -3.214923137394611],
+          [37.92742243138869, -3.214923137394611],
+          [38.02080622045119, -2.814477936100278],
+          [37.82854547826369, -2.1888571714446585],
+          [37.30120172826369, -1.8704539489670708],
+          [37.02105036107619, -1.3103692913935687],
+          [36.32891168920119, -0.9423990503547708],
+          [35.90593805638869, -1.4092183873516004],
+          [35.87297907201369, -2.161411141006024]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var aoi = ROI;
+var startDate = ee.Date('2022-01-01');
+var endDate = ee.Date('2022-12-01');
+ 
+                                    Map.centerObject(aoi,11);
+
+
+var ndviCollection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+  .filterBounds(aoi)
+  .filterDate(startDate, endDate)
+  .map(function (image) {
+    return image
+      .normalizedDifference(['B8', 'B4'])
+      .rename('ndvi')
+      .updateMask(image.select('QA60').not())
+      .copyProperties(image, image.propertyNames());
+  });
+
+var numberOfMonths = endDate.difference(startDate, 'months');
+var monthOffsets = ee.List.sequence(0, numberOfMonths.subtract(1));
+var monthlyNdviCollection = ee.ImageCollection(
+  monthOffsets.map(function (monthOffset) {
+    var dateRange = startDate
+      .advance(ee.Number(monthOffset), 'months')
+      .getRange('month');
+    return ndviCollection
+      .filterDate(dateRange)
+      .median()
+      .set('system:time_start', dateRange.start().millis())
+      .set('system:time_end', dateRange.end().millis());
+  })
+);
+
+Map.addLayer(monthlyNdviCollection, {min:-0.5, max:1,palette:['red','yellow','green']},'monthlyNDVI');
